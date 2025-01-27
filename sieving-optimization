@@ -1,0 +1,89 @@
+//set k as the lattice dimension, depends on the number of CSI-SHark samples available
+min:=2^1000;
+k:=20;
+l:=k+4;
+j:=490;
+//first j+1 columns correspond to n_0,..,n_j, then m_1,..,m_j
+Matrix := ZeroMatrix(RationalField(),4*j+3,2*j+1);
+
+//n_i = 1 (first j+1 rows)
+for i in [0..j] do
+	Matrix[i+1][i+1] := 1;
+end for;
+
+//-2n_i + n_(i+1) + m_(i+1) = -2 (j+2 to 2j+1 row)
+for i in [0..(j-1)] do
+	Matrix[j+2+i][i+1] := -2;
+	Matrix[j+2+i][i+2] := 1;
+	Matrix[j+2+i][i+2+j] := 1;
+end for;
+
+
+
+//sum m_i = 23*j + 500
+for i in [1..j] do
+	Matrix[2*j+2][j+1+i] := 1;
+end for;
+for i in [2*j+3..3*j+3] do 
+Matrix[i][i-2*j-2]:=1;
+end for;
+
+for i in [3*j+4..4*j+3] do
+	Matrix[i][i-2*j-2] := 1;
+end for;
+lhs:=Matrix;
+//setting the right hand side
+rhs:=ZeroMatrix(RationalField(),4*j+3,1);
+for i in [1..j+1] do 
+rhs[i][1]:=1;
+end for;
+for i in [j+2..2*j+1] do 
+rhs[i][1]:=-2;
+end for;
+rhs[2*j+2,1]:=(k+1)*j+500;
+for i in [2*j+3..3*j+3] do 
+rhs[i][1]:=l;
+end for;
+for i in [3*j+4..4*j+3] do
+	rhs[i][1] := 1;
+end for;
+
+//Setting the objective function
+obj:=ZeroMatrix(RationalField(),1,2*j+1);
+for i in [1..j+1] do
+obj[1][i]:=1;
+end for;
+
+//Setting the relations
+relations:=ZeroMatrix(RationalField(),4*j+3,1);
+for i in [1..j+1] do 
+relations[i][1]:=1;
+end for;
+for i in [j+2..2*j+1] do 
+relations[i][1]:=0;
+end for;
+//for i in [2*j+2..3*j+1] do 
+//relations[i][1]:=-1;
+//end for;
+relations[2*j+2,1]:=0;
+for i in [2*j+3..3*j+3] do 
+relations[i][1]:=-1;
+end for;
+for i in [3*j+4..4*j+3] do
+	relations[i][1] := 1;
+end for;
+
+w:=MinimalIntegerSolution(lhs, relations, rhs, obj)[1];
+v:=MinimalIntegerSolution(lhs, relations, rhs, obj)[1];
+sum:=(k+1)^2*2^(v[1]);
+    for i in [1..j] do 
+    sum:=sum+(2*(v[i+1]+v[j+1+i]+1)*2^((v[i+1]+v[j+1+i])/2))/Log(2,Exp(1));
+    end for;
+if (sum lt min) then
+min:=sum;
+w:=v;
+end if;
+print("Minimum value");
+print(min);
+print("Minimum bitsize");
+print(Log(2,min));
