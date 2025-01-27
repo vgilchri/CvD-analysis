@@ -1,0 +1,116 @@
+//Code underlying the Experiments of Section 5.3 of the paper to estimate the constant c_A and how many lattices we can/should iterate through
+
+
+clear;
+
+N := 3*37*1407181*51593604295295867744293584889*31599414504681995853008278745587832204909;
+n := 20;
+threshold_lattice_search := 5.2;
+
+MIN_value := 10;
+MEAN := 0;
+k := 0;
+
+//Algorithm due to Lovasz and Scarf to minimise infinity norm of a matrix A (mxn matrix) using row operations
+LovaszScarf_infty := function(M,Delta)
+	n := NumberOfRows(M); 
+	k := 2;
+	while k le n do 
+		for jdash in [1..(k-1)] do
+			j := k - jdash;
+			//compute whole number which minimises infty norm (let's assume for now it is between -1 and 1)
+			min, mu := Minimum([Maximum([ &+[AbsoluteValue(M[k][l]-mudash*M[j][l]): l in [1..n]]]) :  mudash in [-1..1]]);
+			mu -:= 2; //because mudash runs from -1 to 1
+			M[k] := M[k] - mu*M[j];
+		end for;
+		if [ &+[AbsoluteValue(M[k][l]): l in [1..n]]] le [Delta* &+[AbsoluteValue(M[k-1][l]): l in [1..n]]] then
+			k_row_old := M[k];
+			M[k] := M[k-1];
+			M[k-1] := k_row_old;
+			k := Maximum([k-1,2]);
+		else 
+			k := k+1;
+		end if;
+	end while;
+	return M;		
+end function;
+
+
+ExhaustiveSearch := function(A_red)
+	A_red_inftynorm, idx := Maximum([ &+[AbsoluteValue(A_red[i][j]): j in [1..n]] : i in [1..n]]);
+	for k in [1..7] do //maybe searching through all linear combinations with up to 6 vectors is sufficient for now?
+		k;
+		set_indices := Subsets({1..n},k);
+		for indices in set_indices do
+			for signs in [2^(k-1)..(2^k)-1] do
+				coeffs := Intseq(signs,2);
+				for j in [1..#coeffs] do
+					if coeffs[j] eq 0 then
+						coeffs[j] := -1;
+					end if;
+				end for;
+				LinComb := A_red[idx];
+				for i in indices do
+					if i ne idx then
+						LinComb +:= Random([-1,1])*A_red[i];
+					end if;
+				end for; 
+				if Maximum([ &+[AbsoluteValue(LinComb[j]): j in [1..n]]]) lt A_red_inftynorm then
+					A_red[idx] := LinComb;
+					//RealField()!Maximum([ &+[AbsoluteValue(LinComb[j]): j in [1..n]]])*N^(1/n);
+					return A_red;
+				end if;
+			end for;
+		end for;
+	end for;
+	"Didn't find an improvement in the box.";
+	return A_red;
+end function;
+
+
+while MIN_value gt threshold_lattice_search do
+
+k +:= 1;
+
+//Build Matrix
+A := ZeroMatrix(Rationals(),n,n);
+for i in [1..(n-1)] do
+	A[i][1] := Random([0..(N-1)]);
+	A[i][i+1] := 1; 
+end for;
+A[n][1] := N;
+
+
+//Dual lattice idea (LLL reduce dual lattice) then apply Lovasz-Scarf
+Dual_A := LLL(Transpose(A)^-1 : Delta := 0.999);
+A_Dual := Transpose(Dual_A)^-1;
+A_inv_Dual := A_Dual^-1;
+A_inv_Dual_red := LovaszScarf_infty(A_inv_Dual,0.95);
+
+
+A_inv_infty_Dual_red, idx := Maximum([ &+[AbsoluteValue(A_inv_Dual_red[i][j]): j in [1..n]] : i in [1..n]]);
+
+
+MEAN +:= A_inv_infty_Dual_red * N^(1/n);
+
+if A_inv_infty_Dual_red * N^(1/n) le MIN_value then
+	MIN_value := A_inv_infty_Dual_red * N^(1/n);
+	k, MIN_value;
+	//Transpose(ColumnSubmatrix(A, 1));
+end if;
+
+end while;
+
+
+MEAN := RealField() ! MEAN/k;
+MEAN;
+
+// for exhaustive_steps in [1..10] do	
+// 	//[RealField()! &+[N^(1/20)*AbsoluteValue(A_inv_Dual_red[i][j]): j in [1..n]] : i in [1..n]];
+// 	"current infinity norm:";
+// 	RealField()!Maximum([ &+[N^(1/n)*AbsoluteValue(A_inv_Dual_red[i][j]): j in [1..n]] : i in [1..n]]);
+// 	A_inv_Dual_red := ExhaustiveSearch(A_inv_Dual_red);
+// end for;
+
+
+
